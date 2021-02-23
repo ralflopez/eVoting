@@ -1,0 +1,19 @@
+#primary-img {
+    width: 120px;
+}
+
+.form-container {
+    max-width: 500px;
+}
+
+.title-container {
+    position: relative;
+    padding: 1em;
+    
+    .star {
+        width: 20px;
+        position: absolute;
+        top: 0;
+        right: 0;
+    }
+}

@@ -1,30 +1,34 @@
 const express = require('express');
-const Joi = require('joi');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+const bcrypt = require('bcrypt');
 const router = express.Router();
-const { connection } = require('../config/mysql_db');
 const { getUser, addUser } = require('../config/mysql_users');
 const { LoginUser, RegisterUser } = require('../schema/User');
 
+dotenv.config();
+
+// POST
 router.post('/signup', async (req, res) => {
     //validate input
     const validate = RegisterUser.validate(req.body);
     if('error' in validate)
-        return res.status(400).send(validate.error.details[0].message);
+        return res.status(400).render('auth/signup', { error: validate.error.details[0].message });
 
     //check db
     try {
         const doesExist = await getUser(validate.value.email, true);
         if(doesExist)
-            res.status(400).send('User already exist');
+            res.status(400).json('User already exist');
     } catch(e) {
-        res.status(500).send('Error reaching the database');
+        res.status(500).render('auth/signup', { error:  'Error reaching the database' });
     }
 
     //add to db
     try {
         await addUser(validate.value);
     } catch(e) {
-        res.status(500).send('Unable to add the user. Try again later');
+        res.status(500).render('auth/signup', { error: 'Unable to add the user. Try again later' });
     }
 
     res.send();
@@ -34,24 +38,52 @@ router.post('/login', async (req, res) => {
     //validate input
     const validate = LoginUser.validate(req.body);
     if('error' in validate)
-        return res.status(400).send(validate.error.details[0].message);
+        return res.status(400).render('auth/login', { error: validate.error.details[0].message });
 
     //check db
+    let user;
     try {
-        const user = await getUser(validate.value.email);
+        user = await getUser(validate.value.email);
         if(user.length === 0)
-            res.status(400).send('User doesn\'t exist');
+            return res.status(400).render('auth/login', { error: 'User doesn\'t exist' });
+        console.log(user)
     } catch(e) {
-        res.status(500).send('Error reaching the database');
+        return res.status(500).render('auth/login', { error: 'Error reaching the database' });
     }
 
     //verify pass
-    const valid = await bcrypt.compare(user[0].password, validate.value.password);
+    const valid = await bcrypt.compare(validate.value.password, user[0].password);
     if(!valid)
-        return res.status(400).send('Invalid email or password');
+        return res.status(400).render('auth/login', { error: 'Invalid email or password' });
     
+    //add token
+    const info = {
+        name: user.name,
+        email: user.email
+    };
+    const secret = process.env.JWT_SECRET;
+    const expiry = {
+        expiresIn: '5h'
+    }
+
+    const token = jwt.sign(info, secret, expiry);
     
-    res.send();
+    res.header('auth-token', token).json(validate.value.email).redirect('/');
 });
 
-module.exports = router;
+const checkAuth = (req, res, next) => {
+    const token = req.header('auth-token');
+    if(!token)
+        return res.status(403).redirect('/login');
+    
+    try {
+        const secret = process.env.JWT_SECRET;
+        const validate = jwt.verify(token, secret);
+        req.user = validate;
+        next();
+    } catch(e) {
+        return res.status(403).redirect('/login');
+    }
+}
+
+module.exports = { router, checkAuth };

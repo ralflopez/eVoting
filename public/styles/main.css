@@ -1,0 +1,25 @@
+.h-100 {
+  min-height: 100vh;
+  margin: 0;
+}
+
+#primary-img {
+  width: 120px;
+}
+
+.form-container {
+  max-width: 500px;
+}
+
+.title-container {
+  position: relative;
+  padding: 1em;
+}
+
+.title-container .star {
+  width: 20px;
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+/*# sourceMappingURL=main.css.map */
